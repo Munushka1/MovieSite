@@ -392,7 +392,7 @@
     .watch-btn {
       position: absolute;
       top: 1.5rem;
-      right: 5rem;
+      right: 10rem;
       padding: 0.75rem 2rem;
       background: var(--netflix-red);
       border: none;
@@ -586,10 +586,10 @@
     .modal-actions {
       position: absolute;
       top: 1.5rem;
-      right: 5rem;
+      right: 1.5rem;
       display: flex;
       gap: 0.75rem;
-      z-index: 10;
+      z-index: 11;
     }
 
     .modal-action-btn {
@@ -1109,7 +1109,7 @@
       };
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
-        const baseParams = '?primaryColor=%23e50914&secondaryColor=%23b20710&iconColor=%23ffffff&autoplay=true';
+        const baseParams = '?primaryColor=e50914&secondaryColor=b20710&iconColor=ffffff&autoplay=true';
         if (movie.media_type === 'tv' && season && episode) {
           return `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}${baseParams}`;
         } else if (movie.media_type === 'movie') {
@@ -1134,8 +1134,15 @@
       const MovieCard = ({ movie, showActions = true, listName = null }) => {
         const nextEp = movie.episodeProgress ? getNextEpisode(movie) : null;
         
+        const handleCardClick = (e) => {
+          // Don't open modal if clicking on buttons
+          if (e.target.closest('.movie-actions')) return;
+          setSelectedMovie(movie);
+          fetchMovieDetails(movie);
+        };
+        
         return (
-          <div className="movie-card" onClick={() => { setSelectedMovie(movie); fetchMovieDetails(movie); }}>
+          <div className="movie-card" onClick={handleCardClick}>
             <img
               className="movie-poster"
               src={movie.poster_path 
