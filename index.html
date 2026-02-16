@@ -672,21 +672,21 @@
       align-items: center;
       gap: 0.5rem;
       background: transparent;
-      border: 2px solid var(--netflix-red);
-      color: white;
-      padding: 0.75rem 1.5rem;
+      border: 1px solid rgba(229, 9, 20, 0.3);
+      color: rgba(255, 255, 255, 0.7);
+      padding: 0.5rem 1rem;
       font-family: 'Sora', sans-serif;
-      font-weight: 600;
-      font-size: 0.95rem;
+      font-weight: 500;
+      font-size: 0.85rem;
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.3s ease;
     }
 
     .back-btn:hover {
-      background: var(--netflix-red);
-      box-shadow: 0 0 20px rgba(229, 9, 20, 0.6);
-      transform: translateX(-4px);
+      background: rgba(229, 9, 20, 0.1);
+      border-color: var(--netflix-red);
+      color: white;
     }
 
     .player-iframe {
@@ -974,7 +974,7 @@
               });
           }
 
-          // Update episode progress in state immediately
+          // Update episode progress in state immediately for instant feedback
           const newEpisodeProgress = { ...movieDetails.episodeProgress };
           if (isWatched) {
             delete newEpisodeProgress[key];
@@ -984,8 +984,13 @@
           
           setMovieDetails({ ...movieDetails, episodeProgress: newEpisodeProgress });
           
-          // Update list status in background
-          updateShowStatus(tmdbId);
+          // Debounce the list status update to prevent flicker
+          if (window.updateShowStatusTimeout) {
+            clearTimeout(window.updateShowStatusTimeout);
+          }
+          window.updateShowStatusTimeout = setTimeout(() => {
+            updateShowStatus(tmdbId);
+          }, 1000);
         } catch (error) {
           console.error('Error toggling episode:', error);
         }
@@ -998,27 +1003,28 @@
             .select('*')
             .eq('tmdb_id', tmdbId);
 
-          const movie = selectedMovie;
           const totalEpisodes = movieDetails.seasons?.reduce((sum, s) => sum + (s.episode_count || 0), 0) || 0;
           const watchedCount = episodes?.length || 0;
 
           const movieData = {
-            tmdb_id: movie.id,
-            title: movie.title || movie.name,
-            poster_path: movie.poster_path,
-            release_date: movie.release_date || movie.first_air_date,
-            media_type: movie.media_type,
-            overview: movie.overview,
-            vote_average: movie.vote_average
+            tmdb_id: selectedMovie.id || selectedMovie.tmdb_id,
+            title: selectedMovie.title || selectedMovie.name,
+            poster_path: selectedMovie.poster_path,
+            release_date: selectedMovie.release_date || selectedMovie.first_air_date,
+            media_type: selectedMovie.media_type,
+            overview: selectedMovie.overview,
+            vote_average: selectedMovie.vote_average
           };
 
           // Remove from all lists first
-          await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
-          await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
-          await supabase.from('watched').delete().eq('tmdb_id', tmdbId);
+          await Promise.all([
+            supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId),
+            supabase.from('watchlist').delete().eq('tmdb_id', tmdbId),
+            supabase.from('watched').delete().eq('tmdb_id', tmdbId)
+          ]);
 
           if (watchedCount === 0) {
-            // Not started, keep in watchlist if it's there
+            // Not started, don't add to any list
           } else if (watchedCount >= totalEpisodes && totalEpisodes > 0) {
             // All episodes watched
             await supabase.from('watched').upsert(movieData);
@@ -1026,6 +1032,9 @@
             // Partially watched
             await supabase.from('currently_watching').upsert(movieData);
           }
+          
+          // Reload in background
+          loadMovies();
         } catch (error) {
           console.error('Error updating show status:', error);
         }
@@ -1100,7 +1109,7 @@
       };
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
-        const baseParams = '?primaryColor=%23e50914&secondaryColor=%23b20710&iconColor=%23ffffff&autoplay=false';
+        const baseParams = '?primaryColor=%23e50914&secondaryColor=%23b20710&iconColor=%23ffffff&autoplay=true';
         if (movie.media_type === 'tv' && season && episode) {
           return `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}${baseParams}`;
         } else if (movie.media_type === 'movie') {
