@@ -392,7 +392,7 @@
     .watch-btn {
       position: absolute;
       top: 1.5rem;
-      right: 10rem;
+      right: 1.5rem;
       padding: 0.75rem 2rem;
       background: var(--netflix-red);
       border: none;
@@ -586,7 +586,7 @@
     .modal-actions {
       position: absolute;
       top: 1.5rem;
-      right: 1.5rem;
+      right: 12rem;
       display: flex;
       gap: 0.75rem;
       z-index: 11;
@@ -1109,13 +1109,15 @@
       };
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
-        const baseParams = '?primaryColor=e50914&secondaryColor=b20710&iconColor=ffffff&autoplay=true';
-        if (movie.media_type === 'tv' && season && episode) {
-          return `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}${baseParams}`;
-        } else if (movie.media_type === 'movie') {
-          return `https://www.vidking.net/embed/movie/${movie.id || movie.tmdb_id}${baseParams}`;
-        }
-        return null;
+        const baseUrl = movie.media_type === 'tv' && season && episode
+          ? `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}`
+          : `https://www.vidking.net/embed/movie/${movie.id || movie.tmdb_id}`;
+        
+        // Try multiple parameter formats - Vidking might use different names
+        const url = `${baseUrl}?color=e50914&autoplay=1`;
+        
+        console.log('Vidking URL:', url);
+        return url;
       };
 
       const openPlayer = (movie, season = null, episode = null) => {
