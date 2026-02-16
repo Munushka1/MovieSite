@@ -671,8 +671,8 @@
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      background: rgba(229, 9, 20, 0.9);
-      border: none;
+      background: transparent;
+      border: 2px solid var(--netflix-red);
       color: white;
       padding: 0.75rem 1.5rem;
       font-family: 'Sora', sans-serif;
@@ -685,6 +685,7 @@
 
     .back-btn:hover {
       background: var(--netflix-red);
+      box-shadow: 0 0 20px rgba(229, 9, 20, 0.6);
       transform: translateX(-4px);
     }
 
@@ -922,7 +923,7 @@
 
       const addToList = async (movie, listName) => {
         const movieData = {
-          tmdb_id: movie.id,
+          tmdb_id: movie.id || movie.tmdb_id,
           title: movie.title || movie.name,
           poster_path: movie.poster_path,
           release_date: movie.release_date || movie.first_air_date,
@@ -933,7 +934,8 @@
 
         try {
           await supabase.from(listName).upsert(movieData);
-          await loadMovies();
+          // Reload movies in background without blocking UI
+          loadMovies();
         } catch (error) {
           console.error(`Error adding to ${listName}:`, error);
         }
@@ -942,7 +944,8 @@
       const removeFromList = async (tmdbId, listName) => {
         try {
           await supabase.from(listName).delete().eq('tmdb_id', tmdbId);
-          await loadMovies();
+          // Reload movies in background without blocking UI
+          loadMovies();
         } catch (error) {
           console.error(`Error removing from ${listName}:`, error);
         }
@@ -1097,10 +1100,11 @@
       };
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
+        const baseParams = '?primaryColor=%23e50914&secondaryColor=%23b20710&iconColor=%23ffffff&autoplay=false';
         if (movie.media_type === 'tv' && season && episode) {
-          return `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}`;
+          return `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}${baseParams}`;
         } else if (movie.media_type === 'movie') {
-          return `https://www.vidking.net/embed/movie/${movie.id || movie.tmdb_id}`;
+          return `https://www.vidking.net/embed/movie/${movie.id || movie.tmdb_id}${baseParams}`;
         }
         return null;
       };
@@ -1122,7 +1126,7 @@
         const nextEp = movie.episodeProgress ? getNextEpisode(movie) : null;
         
         return (
-          <div className="movie-card" onClick={() => { setSelectedMovie(movie); fetchMovieDetails(movie); setShowPlayer(false); }}>
+          <div className="movie-card" onClick={() => { setSelectedMovie(movie); fetchMovieDetails(movie); }}>
             <img
               className="movie-poster"
               src={movie.poster_path 
@@ -1149,6 +1153,9 @@
                     </button>
                   ) : (
                     <>
+                      <button className="action-btn" onClick={() => addToList(movie, 'currently_watching')}>
+                        Watch
+                      </button>
                       <button className="action-btn" onClick={() => addToList(movie, 'watchlist')}>
                         + List
                       </button>
@@ -1166,26 +1173,32 @@
         const isTVShow = movie.media_type === 'tv';
         const tmdbId = movie.id || movie.tmdb_id;
         
-        // Check if movie is in watchlist or watched
-        const inWatchlist = watchlist.some(m => m.tmdb_id === tmdbId);
-        const inWatched = watched.some(m => m.tmdb_id === tmdbId);
+        // Local state for optimistic updates
+        const [localInWatchlist, setLocalInWatchlist] = useState(watchlist.some(m => m.tmdb_id === tmdbId));
+        const [localInWatched, setLocalInWatched] = useState(watched.some(m => m.tmdb_id === tmdbId));
 
         const handleAddToWatchlist = async () => {
-          if (inWatchlist) {
+          // Optimistic update
+          setLocalInWatchlist(!localInWatchlist);
+          
+          if (localInWatchlist) {
             await removeFromList(tmdbId, 'watchlist');
           } else {
             await addToList(movie, 'watchlist');
           }
-          await loadMovies();
+          loadMovies();
         };
 
         const handleMarkWatched = async () => {
-          if (inWatched) {
+          // Optimistic update
+          setLocalInWatched(!localInWatched);
+          
+          if (localInWatched) {
             await removeFromList(tmdbId, 'watched');
           } else {
             await addToList(movie, 'watched');
           }
-          await loadMovies();
+          loadMovies();
         };
 
         return (
@@ -1195,16 +1208,16 @@
               
               <div className="modal-actions">
                 <button 
-                  className={`modal-action-btn ${inWatchlist ? 'active' : ''}`}
+                  className={`modal-action-btn ${localInWatchlist ? 'active' : ''}`}
                   onClick={handleAddToWatchlist}
-                  title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
+                  title={localInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
                 >
                   +
                 </button>
                 <button 
-                  className={`modal-action-btn ${inWatched ? 'active' : ''}`}
+                  className={`modal-action-btn ${localInWatched ? 'active' : ''}`}
                   onClick={handleMarkWatched}
-                  title={inWatched ? "Remove from Watched" : "Mark as Watched"}
+                  title={localInWatched ? "Remove from Watched" : "Mark as Watched"}
                 >
                   ✓
                 </button>
