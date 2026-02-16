@@ -1,0 +1,28 @@
+# Netlify Configuration for Movie Tracker
+
+# Build settings
+[build]
+  publish = "."
+  command = "chmod +x build.sh && ./build.sh"
+  
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    
+# Cache static assets
+[[headers]]
+  for = "*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Redirect rules (if needed)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
