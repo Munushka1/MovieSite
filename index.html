@@ -690,6 +690,60 @@
       supabaseKey: 'SUPABASE_KEY_PLACEHOLDER'
     };
 
+    // Check if environment variables were injected
+    const isConfigured = 
+      CONFIG.tmdbApiKey !== 'TMDB_API_KEY_PLACEHOLDER' &&
+      CONFIG.supabaseUrl !== 'SUPABASE_URL_PLACEHOLDER' &&
+      CONFIG.supabaseKey !== 'SUPABASE_KEY_PLACEHOLDER';
+
+    // Error Component
+    function ConfigError() {
+      return (
+        <div style={{
+          maxWidth: '600px',
+          margin: '4rem auto',
+          padding: '2rem',
+          background: 'var(--charcoal)',
+          border: '1px solid rgba(229, 9, 20, 0.5)',
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h2 style={{
+            fontFamily: 'Sora, sans-serif',
+            fontSize: '2rem',
+            marginBottom: '1.5rem',
+            color: 'var(--netflix-red)',
+            fontWeight: '700'
+          }}>⚠️ Configuration Missing</h2>
+          <p style={{
+            fontSize: '1rem',
+            lineHeight: '1.7',
+            color: 'var(--silver)',
+            marginBottom: '1.5rem'
+          }}>
+            Environment variables are not configured. Please set the following in your Netlify dashboard:
+          </p>
+          <ul style={{
+            textAlign: 'left',
+            color: 'var(--silver)',
+            fontSize: '0.95rem',
+            lineHeight: '1.8',
+            marginBottom: '1.5rem'
+          }}>
+            <li><code style={{color: 'var(--netflix-red)'}}>TMDB_API_KEY</code> - Your TMDB API key</li>
+            <li><code style={{color: 'var(--netflix-red)'}}>SUPABASE_URL</code> - Your Supabase project URL</li>
+            <li><code style={{color: 'var(--netflix-red)'}}>SUPABASE_KEY</code> - Your Supabase anon key</li>
+          </ul>
+          <p style={{
+            fontSize: '0.9rem',
+            color: 'rgba(229, 229, 229, 0.7)'
+          }}>
+            After adding variables, trigger a new deploy: <strong>Deploys → Trigger Deploy → Clear cache and deploy site</strong>
+          </p>
+        </div>
+      );
+    }
+
     // Main App Component
     function App() {
       const [supabase, setSupabase] = useState(null);
@@ -708,7 +762,7 @@
 
       // Initialize Supabase
       useEffect(() => {
-        const { createClient } = supabase;
+        const { createClient } = window.supabase;
         const client = createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
         setSupabase(client);
       }, []);
@@ -1254,7 +1308,10 @@
       );
     }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+    ReactDOM.render(
+      isConfigured ? <App /> : <ConfigError />, 
+      document.getElementById('root')
+    );
   </script>
 </body>
 </html>
