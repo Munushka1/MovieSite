@@ -1237,6 +1237,19 @@
         setPlayerUrl('');
       };
 
+      const MoviesGrid = React.memo(({ movies, listName = null }) => {
+        return (
+          <div className="movies-grid">
+            {movies.map((movie) => (
+              <MovieCard key={movie.id || movie.tmdb_id} movie={movie} listName={listName} />
+            ))}
+          </div>
+        );
+      }, (prevProps, nextProps) => {
+        // Only re-render if the movies array reference changes
+        return prevProps.movies === nextProps.movies && prevProps.listName === nextProps.listName;
+      });
+
       const MovieCard = React.memo(({ movie, showActions = true, listName = null }) => {
         const [nextEp, setNextEp] = useState(null);
         
@@ -1486,11 +1499,7 @@
               {loading ? (
                 <div className="loading">Searching...</div>
               ) : searchResults.length > 0 ? (
-                <div className="movies-grid">
-                  {searchResults.map((movie) => (
-                    <MovieCard key={movie.id} movie={movie} />
-                  ))}
-                </div>
+                <MoviesGrid movies={searchResults} />
               ) : searchQuery ? (
                 <div className="empty-state">
                   <div className="empty-state-icon">🎬</div>
@@ -1499,11 +1508,7 @@
               ) : popularContent.length > 0 ? (
                 <>
                   <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--silver)' }}>Popular This Week</h2>
-                  <div className="movies-grid">
-                    {popularContent.map((movie) => (
-                      <MovieCard key={movie.id} movie={movie} />
-                    ))}
-                  </div>
+                  <MoviesGrid movies={popularContent} />
                 </>
               ) : (
                 <div className="empty-state">
@@ -1527,11 +1532,7 @@
           <>
             <h1 className="section-title">{currentList.title}</h1>
             {currentList.data.length > 0 ? (
-              <div className="movies-grid">
-                {currentList.data.map((movie) => (
-                  <MovieCard key={movie.tmdb_id} movie={movie} listName={currentList.table} />
-                ))}
-              </div>
+              <MoviesGrid movies={currentList.data} listName={currentList.table} />
             ) : (
               <div className="empty-state">
                 <div className="empty-state-icon">{currentList.icon}</div>
