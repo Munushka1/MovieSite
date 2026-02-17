@@ -932,12 +932,20 @@
       }, [searchQuery, activeTab]);
 
       const fetchMovieDetails = async (movie) => {
+        console.log('fetchMovieDetails called with:', movie);
+        
         try {
           const type = movie.media_type === 'tv' ? 'tv' : 'movie';
+          const movieId = movie.tmdb_id || movie.id;
+          
+          console.log('Fetching details for:', { type, movieId });
+          
           const detailsResponse = await fetch(
-            `https://api.themoviedb.org/3/${type}/${movie.id || movie.tmdb_id}?api_key=${CONFIG.tmdbApiKey}&append_to_response=credits`
+            `https://api.themoviedb.org/3/${type}/${movieId}?api_key=${CONFIG.tmdbApiKey}&append_to_response=credits`
           );
           const details = await detailsResponse.json();
+          
+          console.log('Details fetched:', details);
 
           // Fetch episode progress if TV show
           let episodeProgress = {};
@@ -945,7 +953,9 @@
             const { data } = await supabase
               .from('episode_progress')
               .select('*')
-              .eq('tmdb_id', movie.id || movie.tmdb_id);
+              .eq('tmdb_id', movieId);
+            
+            console.log('Episode progress:', data);
             
             if (data) {
               episodeProgress = data.reduce((acc, ep) => {
@@ -1161,14 +1171,23 @@
       };
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
-        const baseUrl = movie.media_type === 'tv' && season && episode
-          ? `https://www.vidking.net/embed/tv/${movie.id || movie.tmdb_id}/${season}/${episode}`
-          : `https://www.vidking.net/embed/movie/${movie.id || movie.tmdb_id}`;
+        const movieId = movie.tmdb_id || movie.id;
+        let baseUrl;
+        
+        if (movie.media_type === 'tv' && season && episode) {
+          baseUrl = `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}`;
+        } else if (movie.media_type === 'movie') {
+          baseUrl = `https://www.vidking.net/embed/movie/${movieId}`;
+        } else {
+          console.error('Invalid movie data for Vidking:', movie, season, episode);
+          return null;
+        }
         
         // Vidking parameters: color, autoplay, nextEpisode button, episode selector
         const url = `${baseUrl}?color=e50914&autoplay=true&nextbutton=true&episodeselector=true`;
         
-        console.log('Vidking URL:', url);
+        console.log('Vidking URL constructed:', url);
+        console.log('From movie:', { movieId, media_type: movie.media_type, season, episode });
         return url;
       };
 
@@ -1306,9 +1325,9 @@
               
               <button 
                 className="watch-btn" 
-                onClick={() => {
+                onClick={async () => {
                   if (isTVShow) {
-                    const nextEp = getNextEpisode({ ...movie, episodeProgress: details?.episodeProgress });
+                    const nextEp = await getNextEpisode({ ...movie, episodeProgress: details?.episodeProgress });
                     if (nextEp) {
                       openPlayer(movie, nextEp.season, nextEp.episode);
                     } else {
@@ -1491,7 +1510,7 @@
                 className="player-iframe"
                 src={playerUrl}
                 allowFullScreen
-                allow="autoplay; encrypted-media"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
               />
             </div>
           ) : (
