@@ -748,7 +748,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef, useCallback } = React;
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
     // Get config from build-time environment variables
     const CONFIG = {
@@ -1480,7 +1480,7 @@
         );
       });
 
-      const renderContent = () => {
+      const content = useMemo(() => {
         if (activeTab === 'search') {
           return (
             <>
@@ -1541,7 +1541,7 @@
             )}
           </>
         );
-      };
+      }, [activeTab, searchQuery, searchResults, loading, popularContent, currentlyWatching, watchlist, watched]);
 
       return (
         <>
@@ -1596,7 +1596,7 @@
               </div>
 
               <div className={`main-content ${!sidebarOpen ? 'sidebar-hidden' : ''}`}>
-                {renderContent()}
+                {content}
               </div>
 
               {selectedMovie && movieDetails && (
