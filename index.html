@@ -1363,8 +1363,16 @@
             await addToList(movie, 'watched');
             
             // Remove from watchlist (for movies) and currently watching (for both)
-            await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
-            await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
+            const deletePromises = [
+              supabase.from('watchlist').delete().eq('tmdb_id', tmdbId),
+              supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId)
+            ];
+            await Promise.all(deletePromises);
+            
+            // Update parent state to remove from those lists immediately
+            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            setLocalInWatchlist(false);
             
             // If TV show, mark ALL episodes as watched
             if (isTVShow && details?.seasons) {
@@ -1444,6 +1452,13 @@
               };
               await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
               await supabase.from('currently_watching').upsert(movieData);
+              
+              // Update parent state
+              setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+              setCurrentlyWatching(prev => {
+                const exists = prev.some(m => m.tmdb_id === tmdbId);
+                return exists ? prev : [...prev, movieData];
+              });
             }
             
             // Check if all episodes are watched (move to watched)
@@ -1465,6 +1480,13 @@
               };
               await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
               await supabase.from('watched').upsert(movieData);
+              
+              // Update parent state
+              setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+              setWatched(prev => {
+                const exists = prev.some(m => m.tmdb_id === tmdbId);
+                return exists ? prev : [...prev, movieData];
+              });
             }
           } catch (error) {
             console.error('Error toggling episode:', error);
