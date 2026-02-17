@@ -822,6 +822,7 @@
       const [watchlist, setWatchlist] = useState([]);
       const [watched, setWatched] = useState([]);
       const [selectedMovie, setSelectedMovie] = useState(null);
+      const pendingShowUpdate = useRef(null);
       const [movieDetails, setMovieDetails] = useState(null);
       const [showPlayer, setShowPlayer] = useState(false);
       const [playerUrl, setPlayerUrl] = useState('');
@@ -1053,13 +1054,14 @@
           
           setMovieDetails({ ...movieDetails, episodeProgress: newEpisodeProgress });
           
-          // Update show status in database (debounced)
+          // Queue show status update - will run when modal closes
           if (window.updateShowStatusTimeout) {
             clearTimeout(window.updateShowStatusTimeout);
           }
+          pendingShowUpdate.current = tmdbId;
           window.updateShowStatusTimeout = setTimeout(() => {
             updateShowStatus(tmdbId);
-          }, 1000);
+          }, 800);
         } catch (error) {
           console.error('Error toggling episode:', error);
         }
@@ -1072,7 +1074,10 @@
             .select('*')
             .eq('tmdb_id', tmdbId);
 
-          const totalEpisodes = movieDetails.seasons?.reduce((sum, s) => sum + (s.episode_count || 0), 0) || 0;
+          const totalEpisodes = movieDetails.seasons?.reduce((sum, s) => {
+            if (s.season_number === 0) return sum;
+            return sum + (s.episode_count || 0);
+          }, 0) || 0;
           const watchedCount = episodes?.length || 0;
 
           const movieData = {
@@ -1085,7 +1090,7 @@
             vote_average: selectedMovie.vote_average
           };
 
-          // Remove from all lists first
+          // Remove from all lists in DB
           await Promise.all([
             supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId),
             supabase.from('watchlist').delete().eq('tmdb_id', tmdbId),
@@ -1093,15 +1098,19 @@
           ]);
 
           if (watchedCount === 0) {
-            // Not started, don't add to any list
+            // Not started - don't add anywhere
           } else if (watchedCount >= totalEpisodes && totalEpisodes > 0) {
-            // All episodes watched
+            // All episodes watched - move to watched
             await supabase.from('watched').upsert(movieData);
           } else {
-            // Partially watched
+            // Partially watched - move to currently watching
             await supabase.from('currently_watching').upsert(movieData);
           }
-          // Don't update state - prevents flicker
+
+          // Only update React state if modal is now closed (no flicker risk)
+          if (!pendingShowUpdate.current) {
+            await loadMovies();
+          }
         } catch (error) {
           console.error('Error updating show status:', error);
         }
@@ -1355,22 +1364,28 @@
                 .from('episode_progress')
                 .delete()
                 .eq('tmdb_id', tmdbId);
-              
               setLocalEpisodeProgress({});
             }
           } else {
-            // Adding to watched
+            // Adding to watched - update state immediately so item moves tabs
             await addToList(movie, 'watched');
             
-            // Remove from watchlist (for movies) and currently watching (for both)
-            await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
-            await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
+            // Remove from watchlist and currently watching in DB
+            await Promise.all([
+              supabase.from('watchlist').delete().eq('tmdb_id', tmdbId),
+              supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId)
+            ]);
+            
+            // Update React state so items disappear from those tabs immediately
+            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            setLocalInWatchlist(false);
             
             // If TV show, mark ALL episodes as watched
             if (isTVShow && details?.seasons) {
               const allEpisodes = [];
               for (const season of details.seasons) {
-                if (season.season_number === 0) continue; // Skip specials
+                if (season.season_number === 0) continue;
                 for (let ep = 1; ep <= season.episode_count; ep++) {
                   allEpisodes.push({
                     tmdb_id: tmdbId,
@@ -1380,12 +1395,8 @@
                   });
                 }
               }
-              
-              // Batch insert all episodes
               if (allEpisodes.length > 0) {
                 await supabase.from('episode_progress').upsert(allEpisodes);
-                
-                // Update local progress
                 const newProgress = {};
                 allEpisodes.forEach(ep => {
                   newProgress[`${ep.season}_${ep.episode}`] = true;
@@ -1657,7 +1668,12 @@
       
       // Modal rendered separately to not affect content memoization
       const modal = selectedMovie && movieDetails ? (
-        <MovieModal movie={selectedMovie} details={movieDetails} onClose={() => { setSelectedMovie(null); setMovieDetails(null); }} />
+        <MovieModal movie={selectedMovie} details={movieDetails} onClose={() => { 
+          setSelectedMovie(null); 
+          setMovieDetails(null);
+          pendingShowUpdate.current = null;
+          loadMovies();
+        }} />
       ) : null;
 
       return (
