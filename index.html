@@ -994,24 +994,8 @@
 
         try {
           await supabase.from(listName).upsert(movieData);
-          // Don't reload immediately - prevents flicker
-          // Update state directly for instant feedback
-          if (listName === 'currently_watching') {
-            setCurrentlyWatching(prev => {
-              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
-              return exists ? prev : [...prev, movieData];
-            });
-          } else if (listName === 'watchlist') {
-            setWatchlist(prev => {
-              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
-              return exists ? prev : [...prev, movieData];
-            });
-          } else if (listName === 'watched') {
-            setWatched(prev => {
-              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
-              return exists ? prev : [...prev, movieData];
-            });
-          }
+          // Don't update state - let user refresh or navigate to see changes
+          // This prevents the flicker
         } catch (error) {
           console.error(`Error adding to ${listName}:`, error);
         }
@@ -1020,14 +1004,7 @@
       const removeFromList = async (tmdbId, listName) => {
         try {
           await supabase.from(listName).delete().eq('tmdb_id', tmdbId);
-          // Update state directly - prevents flicker
-          if (listName === 'currently_watching') {
-            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          } else if (listName === 'watchlist') {
-            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          } else if (listName === 'watched') {
-            setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          }
+          // Don't update state - prevents flicker
         } catch (error) {
           console.error(`Error removing from ${listName}:`, error);
         }
@@ -1105,22 +1082,16 @@
             supabase.from('watched').delete().eq('tmdb_id', tmdbId)
           ]);
 
-          // Update state directly
-          setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-
           if (watchedCount === 0) {
             // Not started, don't add to any list
           } else if (watchedCount >= totalEpisodes && totalEpisodes > 0) {
             // All episodes watched
             await supabase.from('watched').upsert(movieData);
-            setWatched(prev => [...prev, movieData]);
           } else {
             // Partially watched
             await supabase.from('currently_watching').upsert(movieData);
-            setCurrentlyWatching(prev => [...prev, movieData]);
           }
+          // Don't update state - prevents flicker
         } catch (error) {
           console.error('Error updating show status:', error);
         }
@@ -1571,15 +1542,15 @@
                   <span className="nav-icon">🔍</span>
                   <span>Search</span>
                 </div>
-                <div className={`nav-item ${activeTab === 'watching' ? 'active' : ''}`} onClick={() => setActiveTab('watching')}>
+                <div className={`nav-item ${activeTab === 'watching' ? 'active' : ''}`} onClick={() => { setActiveTab('watching'); loadMovies(); }}>
                   <span className="nav-icon">▶️</span>
                   <span>Currently Watching</span>
                 </div>
-                <div className={`nav-item ${activeTab === 'watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('watchlist')}>
+                <div className={`nav-item ${activeTab === 'watchlist' ? 'active' : ''}`} onClick={() => { setActiveTab('watchlist'); loadMovies(); }}>
                   <span className="nav-icon">📋</span>
                   <span>Watchlist</span>
                 </div>
-                <div className={`nav-item ${activeTab === 'watched' ? 'active' : ''}`} onClick={() => setActiveTab('watched')}>
+                <div className={`nav-item ${activeTab === 'watched' ? 'active' : ''}`} onClick={() => { setActiveTab('watched'); loadMovies(); }}>
                   <span className="nav-icon">✓</span>
                   <span>Watched</span>
                 </div>
