@@ -1254,6 +1254,15 @@
         
         const handleRemoveFromList = async (e) => {
           e.stopPropagation();
+          
+          // If TV show in currently watching, clear all episode progress
+          if (movie.media_type === 'tv' && listName === 'currently_watching') {
+            await supabase
+              .from('episode_progress')
+              .delete()
+              .eq('tmdb_id', movie.tmdb_id);
+          }
+          
           await removeFromList(movie.tmdb_id, listName);
         };
         
@@ -1337,9 +1346,53 @@
           setLocalInWatched(!localInWatched);
           
           if (localInWatched) {
-            await removeFromList(tmdbId, 'watched', true); // Skip state update
+            // Removing from watched
+            await removeFromList(tmdbId, 'watched', true);
+            
+            // If TV show, also clear all episode progress
+            if (isTVShow) {
+              await supabase
+                .from('episode_progress')
+                .delete()
+                .eq('tmdb_id', tmdbId);
+              
+              setLocalEpisodeProgress({});
+            }
           } else {
+            // Adding to watched
             await addToList(movie, 'watched');
+            
+            // Remove from watchlist (for movies) and currently watching (for both)
+            await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
+            await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
+            
+            // If TV show, mark ALL episodes as watched
+            if (isTVShow && details?.seasons) {
+              const allEpisodes = [];
+              for (const season of details.seasons) {
+                if (season.season_number === 0) continue; // Skip specials
+                for (let ep = 1; ep <= season.episode_count; ep++) {
+                  allEpisodes.push({
+                    tmdb_id: tmdbId,
+                    season: season.season_number,
+                    episode: ep,
+                    watched: true
+                  });
+                }
+              }
+              
+              // Batch insert all episodes
+              if (allEpisodes.length > 0) {
+                await supabase.from('episode_progress').upsert(allEpisodes);
+                
+                // Update local progress
+                const newProgress = {};
+                allEpisodes.forEach(ep => {
+                  newProgress[`${ep.season}_${ep.episode}`] = true;
+                });
+                setLocalEpisodeProgress(newProgress);
+              }
+            }
           }
         };
         
@@ -1376,13 +1429,43 @@
                 });
             }
             
-            // Update show status in database (debounced)
-            if (window.updateShowStatusTimeout) {
-              clearTimeout(window.updateShowStatusTimeout);
+            // Check if this is the first episode watched (move from watchlist to currently watching)
+            const watchedCount = Object.keys(newProgress).length;
+            if (watchedCount === 1 && !isWatched) {
+              // First episode watched - move to currently watching
+              const movieData = {
+                tmdb_id: tmdbId,
+                title: movie.title || movie.name,
+                poster_path: movie.poster_path,
+                release_date: movie.release_date || movie.first_air_date,
+                media_type: movie.media_type,
+                overview: movie.overview,
+                vote_average: movie.vote_average
+              };
+              await supabase.from('watchlist').delete().eq('tmdb_id', tmdbId);
+              await supabase.from('currently_watching').upsert(movieData);
             }
-            window.updateShowStatusTimeout = setTimeout(() => {
-              updateShowStatus(tmdbId);
-            }, 1000);
+            
+            // Check if all episodes are watched (move to watched)
+            const totalEpisodes = details?.seasons?.reduce((sum, s) => {
+              if (s.season_number === 0) return sum;
+              return sum + (s.episode_count || 0);
+            }, 0) || 0;
+            
+            if (watchedCount >= totalEpisodes && totalEpisodes > 0 && !isWatched) {
+              // All episodes watched - move to watched
+              const movieData = {
+                tmdb_id: tmdbId,
+                title: movie.title || movie.name,
+                poster_path: movie.poster_path,
+                release_date: movie.release_date || movie.first_air_date,
+                media_type: movie.media_type,
+                overview: movie.overview,
+                vote_average: movie.vote_average
+              };
+              await supabase.from('currently_watching').delete().eq('tmdb_id', tmdbId);
+              await supabase.from('watched').upsert(movieData);
+            }
           } catch (error) {
             console.error('Error toggling episode:', error);
           }
