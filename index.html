@@ -1317,6 +1317,9 @@
         // Local state for optimistic updates
         const [localInWatchlist, setLocalInWatchlist] = useState(watchlist.some(m => m.tmdb_id === tmdbId));
         const [localInWatched, setLocalInWatched] = useState(watched.some(m => m.tmdb_id === tmdbId));
+        
+        // Local episode progress state - doesn't affect parent
+        const [localEpisodeProgress, setLocalEpisodeProgress] = useState(details?.episodeProgress || {});
 
         const handleAddToWatchlist = async () => {
           // Optimistic update
@@ -1337,6 +1340,51 @@
             await removeFromList(tmdbId, 'watched', true); // Skip state update
           } else {
             await addToList(movie, 'watched');
+          }
+        };
+        
+        const handleToggleEpisode = async (season, episode) => {
+          const key = `${season}_${episode}`;
+          const isWatched = localEpisodeProgress[key];
+          
+          // Update local state immediately
+          const newProgress = { ...localEpisodeProgress };
+          if (isWatched) {
+            delete newProgress[key];
+          } else {
+            newProgress[key] = true;
+          }
+          setLocalEpisodeProgress(newProgress);
+          
+          // Save to database in background
+          try {
+            if (isWatched) {
+              await supabase
+                .from('episode_progress')
+                .delete()
+                .eq('tmdb_id', tmdbId)
+                .eq('season', season)
+                .eq('episode', episode);
+            } else {
+              await supabase
+                .from('episode_progress')
+                .upsert({
+                  tmdb_id: tmdbId,
+                  season,
+                  episode,
+                  watched: true
+                });
+            }
+            
+            // Update show status in database (debounced)
+            if (window.updateShowStatusTimeout) {
+              clearTimeout(window.updateShowStatusTimeout);
+            }
+            window.updateShowStatusTimeout = setTimeout(() => {
+              updateShowStatus(tmdbId);
+            }, 1000);
+          } catch (error) {
+            console.error('Error toggling episode:', error);
           }
         };
 
@@ -1415,13 +1463,13 @@
                     <div className="episodes-grid">
                       {Array.from({ length: details.seasons.find(s => s.season_number === selectedSeason)?.episode_count || 0 }, (_, i) => i + 1).map(ep => {
                         const key = `${selectedSeason}_${ep}`;
-                        const isWatched = details.episodeProgress?.[key];
+                        const isWatched = localEpisodeProgress[key];
                         
                         return (
                           <div
                             key={ep}
                             className={`episode-item ${isWatched ? 'watched' : ''}`}
-                            onClick={() => toggleEpisodeWatched(movie.id, selectedSeason, ep)}
+                            onClick={() => handleToggleEpisode(selectedSeason, ep)}
                           >
                             <div className="episode-number">Episode {ep}</div>
                             <div className="episode-status">
