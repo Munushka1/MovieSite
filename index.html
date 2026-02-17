@@ -1001,17 +1001,19 @@
         }
       };
 
-      const removeFromList = async (tmdbId, listName) => {
+      const removeFromList = async (tmdbId, listName, skipStateUpdate = false) => {
         try {
           await supabase.from(listName).delete().eq('tmdb_id', tmdbId);
           
-          // Update state immediately for Remove button
-          if (listName === 'currently_watching') {
-            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          } else if (listName === 'watchlist') {
-            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
-          } else if (listName === 'watched') {
-            setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          // Only update state if called from Remove button on cards
+          if (!skipStateUpdate) {
+            if (listName === 'currently_watching') {
+              setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            } else if (listName === 'watchlist') {
+              setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            } else if (listName === 'watched') {
+              setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+            }
           }
         } catch (error) {
           console.error(`Error removing from ${listName}:`, error);
@@ -1321,7 +1323,7 @@
           setLocalInWatchlist(!localInWatchlist);
           
           if (localInWatchlist) {
-            await removeFromList(tmdbId, 'watchlist');
+            await removeFromList(tmdbId, 'watchlist', true); // Skip state update
           } else {
             await addToList(movie, 'watchlist');
           }
@@ -1332,7 +1334,7 @@
           setLocalInWatched(!localInWatched);
           
           if (localInWatched) {
-            await removeFromList(tmdbId, 'watched');
+            await removeFromList(tmdbId, 'watched', true); // Skip state update
           } else {
             await addToList(movie, 'watched');
           }
