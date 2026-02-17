@@ -1494,8 +1494,8 @@
                 <div className="loading">Searching...</div>
               ) : searchResults.length > 0 ? (
                 <div className="movies-grid">
-                  {searchResults.map((movie, idx) => (
-                    <MovieCard key={movie.id} movie={movie} style={{animationDelay: `${idx * 0.05}s`}} />
+                  {searchResults.map((movie) => (
+                    <MovieCard key={movie.id} movie={movie} />
                   ))}
                 </div>
               ) : searchQuery ? (
@@ -1507,8 +1507,8 @@
                 <>
                   <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--silver)' }}>Popular This Week</h2>
                   <div className="movies-grid">
-                    {popularContent.map((movie, idx) => (
-                      <MovieCard key={movie.id} movie={movie} style={{animationDelay: `${idx * 0.05}s`}} />
+                    {popularContent.map((movie) => (
+                      <MovieCard key={movie.id} movie={movie} />
                     ))}
                   </div>
                 </>
@@ -1535,8 +1535,8 @@
             <h1 className="section-title">{currentList.title}</h1>
             {currentList.data.length > 0 ? (
               <div className="movies-grid">
-                {currentList.data.map((movie, idx) => (
-                  <MovieCard key={movie.tmdb_id} movie={movie} listName={currentList.table} style={{animationDelay: `${idx * 0.05}s`}} />
+                {currentList.data.map((movie) => (
+                  <MovieCard key={movie.tmdb_id} movie={movie} listName={currentList.table} />
                 ))}
               </div>
             ) : (
