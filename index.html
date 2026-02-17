@@ -246,7 +246,7 @@
     .movie-card {
       position: relative;
       cursor: pointer;
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
       animation: fadeIn 0.6s ease-out both;
     }
 
@@ -325,6 +325,17 @@
       background: var(--netflix-red);
       color: white;
       border-color: var(--netflix-red);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .action-btn:disabled:hover {
+      background: rgba(229, 9, 20, 0.1);
+      color: var(--netflix-red);
+      transform: none;
     }
 
     .modal {
@@ -1230,12 +1241,13 @@
 
       const MovieCard = React.memo(({ movie, showActions = true, listName = null }) => {
         const [nextEp, setNextEp] = useState(null);
+        const [isProcessing, setIsProcessing] = useState(false);
         
         useEffect(() => {
           if (movie.episodeProgress && movie.media_type === 'tv') {
             getNextEpisode(movie).then(ep => setNextEp(ep));
           }
-        }, [movie.tmdb_id, movie.episodeProgress]);
+        }, [movie.tmdb_id]);
         
         const handleCardClick = (e) => {
           // Don't open modal if clicking on buttons
@@ -1244,8 +1256,14 @@
           fetchMovieDetails(movie);
         };
         
+        const handleAction = async (action) => {
+          setIsProcessing(true);
+          await action();
+          setIsProcessing(false);
+        };
+        
         return (
-          <div className="movie-card" onClick={handleCardClick}>
+          <div className="movie-card" onClick={handleCardClick} style={{ opacity: isProcessing ? 0.6 : 1 }}>
             <img
               className="movie-poster"
               src={movie.poster_path 
@@ -1267,16 +1285,28 @@
               {showActions && (
                 <div className="movie-actions" onClick={(e) => e.stopPropagation()}>
                   {listName ? (
-                    <button className="action-btn" onClick={() => removeFromList(movie.tmdb_id, listName)}>
-                      Remove
+                    <button 
+                      className="action-btn" 
+                      onClick={() => handleAction(() => removeFromList(movie.tmdb_id, listName))}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? '...' : 'Remove'}
                     </button>
                   ) : (
                     <>
-                      <button className="action-btn" onClick={() => addToList(movie, 'currently_watching')}>
-                        Watch
+                      <button 
+                        className="action-btn" 
+                        onClick={() => handleAction(() => addToList(movie, 'currently_watching'))}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? '...' : 'Watch'}
                       </button>
-                      <button className="action-btn" onClick={() => addToList(movie, 'watchlist')}>
-                        + List
+                      <button 
+                        className="action-btn" 
+                        onClick={() => handleAction(() => addToList(movie, 'watchlist'))}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? '...' : '+ List'}
                       </button>
                     </>
                   )}
@@ -1286,10 +1316,12 @@
           </div>
         );
       }, (prevProps, nextProps) => {
-        // Custom comparison - only re-render if movie data actually changed
-        return prevProps.movie.tmdb_id === nextProps.movie.tmdb_id &&
-               JSON.stringify(prevProps.movie.episodeProgress) === JSON.stringify(nextProps.movie.episodeProgress) &&
-               prevProps.listName === nextProps.listName;
+        // Only re-render if the actual data changed, not reference
+        return (
+          prevProps.movie.tmdb_id === nextProps.movie.tmdb_id &&
+          prevProps.listName === nextProps.listName &&
+          prevProps.showActions === nextProps.showActions
+        );
       });
 
       const MovieModal = ({ movie, details, onClose }) => {
