@@ -1033,7 +1033,7 @@
               });
           }
 
-          // Update episode progress in state immediately for instant feedback
+          // Update episode progress in modal state only (doesn't affect cards)
           const newEpisodeProgress = { ...movieDetails.episodeProgress };
           if (isWatched) {
             delete newEpisodeProgress[key];
@@ -1043,7 +1043,7 @@
           
           setMovieDetails({ ...movieDetails, episodeProgress: newEpisodeProgress });
           
-          // Debounce the list status update to prevent flicker
+          // Update show status in database (debounced)
           if (window.updateShowStatusTimeout) {
             clearTimeout(window.updateShowStatusTimeout);
           }
