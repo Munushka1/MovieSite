@@ -985,8 +985,24 @@
 
         try {
           await supabase.from(listName).upsert(movieData);
-          // Reload movies in background without blocking UI
-          loadMovies();
+          // Don't reload immediately - prevents flicker
+          // Update state directly for instant feedback
+          if (listName === 'currently_watching') {
+            setCurrentlyWatching(prev => {
+              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
+              return exists ? prev : [...prev, movieData];
+            });
+          } else if (listName === 'watchlist') {
+            setWatchlist(prev => {
+              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
+              return exists ? prev : [...prev, movieData];
+            });
+          } else if (listName === 'watched') {
+            setWatched(prev => {
+              const exists = prev.some(m => m.tmdb_id === movieData.tmdb_id);
+              return exists ? prev : [...prev, movieData];
+            });
+          }
         } catch (error) {
           console.error(`Error adding to ${listName}:`, error);
         }
@@ -995,8 +1011,14 @@
       const removeFromList = async (tmdbId, listName) => {
         try {
           await supabase.from(listName).delete().eq('tmdb_id', tmdbId);
-          // Reload movies in background without blocking UI
-          loadMovies();
+          // Update state directly - prevents flicker
+          if (listName === 'currently_watching') {
+            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          } else if (listName === 'watchlist') {
+            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          } else if (listName === 'watched') {
+            setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          }
         } catch (error) {
           console.error(`Error removing from ${listName}:`, error);
         }
@@ -1074,18 +1096,22 @@
             supabase.from('watched').delete().eq('tmdb_id', tmdbId)
           ]);
 
+          // Update state directly
+          setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+
           if (watchedCount === 0) {
             // Not started, don't add to any list
           } else if (watchedCount >= totalEpisodes && totalEpisodes > 0) {
             // All episodes watched
             await supabase.from('watched').upsert(movieData);
+            setWatched(prev => [...prev, movieData]);
           } else {
             // Partially watched
             await supabase.from('currently_watching').upsert(movieData);
+            setCurrentlyWatching(prev => [...prev, movieData]);
           }
-          
-          // Reload in background
-          loadMovies();
         } catch (error) {
           console.error('Error updating show status:', error);
         }
@@ -1172,22 +1198,20 @@
 
       const getVidkingUrl = (movie, season = null, episode = null) => {
         const movieId = movie.tmdb_id || movie.id;
-        let baseUrl;
+        let url;
         
         if (movie.media_type === 'tv' && season && episode) {
-          baseUrl = `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}`;
+          // TV shows - include all features
+          url = `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=e50914&autoPlay=true&nextEpisode=true&episodeSelector=true`;
         } else if (movie.media_type === 'movie') {
-          baseUrl = `https://www.vidking.net/embed/movie/${movieId}`;
+          // Movies - only color and autoplay
+          url = `https://www.vidking.net/embed/movie/${movieId}?color=e50914&autoPlay=true`;
         } else {
           console.error('Invalid movie data for Vidking:', movie, season, episode);
           return null;
         }
         
-        // Vidking parameters: color, autoplay, nextEpisode button, episode selector
-        const url = `${baseUrl}?color=e50914&autoplay=true&nextbutton=true&episodeselector=true`;
-        
         console.log('Vidking URL constructed:', url);
-        console.log('From movie:', { movieId, media_type: movie.media_type, season, episode });
         return url;
       };
 
@@ -1286,7 +1310,6 @@
           } else {
             await addToList(movie, 'watchlist');
           }
-          loadMovies();
         };
 
         const handleMarkWatched = async () => {
@@ -1298,7 +1321,6 @@
           } else {
             await addToList(movie, 'watched');
           }
-          loadMovies();
         };
 
         return (
