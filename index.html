@@ -1239,7 +1239,6 @@
 
       const MovieCard = React.memo(({ movie, showActions = true, listName = null }) => {
         const [nextEp, setNextEp] = useState(null);
-        const [isProcessing, setIsProcessing] = useState(false);
         
         useEffect(() => {
           if (movie.episodeProgress && movie.media_type === 'tv') {
@@ -1254,14 +1253,18 @@
           fetchMovieDetails(movie);
         };
         
-        const handleAction = async (action) => {
-          setIsProcessing(true);
-          await action();
-          setIsProcessing(false);
+        const handleAddToList = async (e, listName) => {
+          e.stopPropagation();
+          await addToList(movie, listName);
+        };
+        
+        const handleRemoveFromList = async (e) => {
+          e.stopPropagation();
+          await removeFromList(movie.tmdb_id, listName);
         };
         
         return (
-          <div className="movie-card" onClick={handleCardClick} style={{ opacity: isProcessing ? 0.6 : 1 }}>
+          <div className="movie-card" onClick={handleCardClick}>
             <img
               className="movie-poster"
               src={movie.poster_path 
@@ -1281,30 +1284,27 @@
                 </div>
               )}
               {showActions && (
-                <div className="movie-actions" onClick={(e) => e.stopPropagation()}>
+                <div className="movie-actions">
                   {listName ? (
                     <button 
                       className="action-btn" 
-                      onClick={() => handleAction(() => removeFromList(movie.tmdb_id, listName))}
-                      disabled={isProcessing}
+                      onClick={handleRemoveFromList}
                     >
-                      {isProcessing ? '...' : 'Remove'}
+                      Remove
                     </button>
                   ) : (
                     <>
                       <button 
                         className="action-btn" 
-                        onClick={() => handleAction(() => addToList(movie, 'currently_watching'))}
-                        disabled={isProcessing}
+                        onClick={(e) => handleAddToList(e, 'currently_watching')}
                       >
-                        {isProcessing ? '...' : 'Watch'}
+                        Watch
                       </button>
                       <button 
                         className="action-btn" 
-                        onClick={() => handleAction(() => addToList(movie, 'watchlist'))}
-                        disabled={isProcessing}
+                        onClick={(e) => handleAddToList(e, 'watchlist')}
                       >
-                        {isProcessing ? '...' : '+ List'}
+                        + List
                       </button>
                     </>
                   )}
@@ -1313,16 +1313,9 @@
             </div>
           </div>
         );
-      }, (prevProps, nextProps) => {
-        // Only re-render if the actual data changed, not reference
-        return (
-          prevProps.movie.tmdb_id === nextProps.movie.tmdb_id &&
-          prevProps.listName === nextProps.listName &&
-          prevProps.showActions === nextProps.showActions
-        );
-      });
+      }, () => true); // Never re-render unless key changes
 
-      const MovieModal = ({ movie, details, onClose }) => {
+      const MovieModal = React.memo(({ movie, details, onClose }) => {
         const [selectedSeason, setSelectedSeason] = useState(1);
         const isTVShow = movie.media_type === 'tv';
         const tmdbId = movie.id || movie.tmdb_id;
@@ -1472,7 +1465,7 @@
             </div>
           </div>
         );
-      };
+      });
 
       const renderContent = () => {
         if (activeTab === 'search') {
