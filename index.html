@@ -1004,7 +1004,15 @@
       const removeFromList = async (tmdbId, listName) => {
         try {
           await supabase.from(listName).delete().eq('tmdb_id', tmdbId);
-          // Don't update state - prevents flicker
+          
+          // Update state immediately for Remove button
+          if (listName === 'currently_watching') {
+            setCurrentlyWatching(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          } else if (listName === 'watchlist') {
+            setWatchlist(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          } else if (listName === 'watched') {
+            setWatched(prev => prev.filter(m => m.tmdb_id !== tmdbId));
+          }
         } catch (error) {
           console.error(`Error removing from ${listName}:`, error);
         }
@@ -1513,6 +1521,11 @@
           </>
         );
       }, [activeTab, searchQuery, searchResults, loading, popularContent, currentlyWatching, watchlist, watched]);
+      
+      // Modal rendered separately to not affect content memoization
+      const modal = selectedMovie && movieDetails ? (
+        <MovieModal movie={selectedMovie} details={movieDetails} onClose={() => { setSelectedMovie(null); setMovieDetails(null); }} />
+      ) : null;
 
       return (
         <>
@@ -1570,9 +1583,7 @@
                 {content}
               </div>
 
-              {selectedMovie && movieDetails && (
-                <MovieModal movie={selectedMovie} details={movieDetails} onClose={() => { setSelectedMovie(null); setMovieDetails(null); }} />
-              )}
+              {modal}
             </>
           )}
         </>
