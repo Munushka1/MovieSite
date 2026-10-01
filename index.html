@@ -1192,7 +1192,7 @@
         
         if (movie.media_type === 'tv' && season && episode) {
           // TV shows - include all features
-          url = `https://www.cinesrc.st/embed/tv/${movieId}/${season}/${episode}`;
+          url = `https://www.cinesrc.st/embed/tv/${movieId}?s=${season}&e=${episode}`;
         } else if (movie.media_type === 'movie') {
           // Movies - only color and autoplay
           url = `https://www.cinesrc.st/embed/movie/${movieId}`;
